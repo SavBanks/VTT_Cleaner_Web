@@ -27,7 +27,7 @@ def clean():
     file.save(input_path)
 
     # Run the VTT cleaning
-    clean_vtt_file(input_path, output_path)
+    clean_vtt_text(input_path, output_path)
 
     return send_file(output_path, as_attachment=True)
 
