@@ -1,170 +1,168 @@
 import re
 
-# ============================================================
-# CONFIG LISTS
-# ============================================================
+# ==========================
+#  CONFIGURATION LISTS
+# ==========================
 
 CONJUNCTIONS = ["and", "but", "or", "nor", "yet", "so"]
 
 COMMON_LOWER_WORDS = [
-    "the","and","but","or","nor","for","yet","so","a","an","to","in","on","at","by",
-    "from","with","of","as","that","this","these","those","is","are","was","were",
-    "be","been","being","it","its","if","then","else","also","not","very","just",
-    "such","than","because","when","where","while","however","therefore","thus",
-    "although","though","unless","until","whether","like","unlike","about","above",
-    "below","under","over","again","already","still","even","too","very","maybe",
-    "perhaps","almost","nearly","basically","actually","literally","really",
-    "kind","sort","part","might","should","could","would","will","can","may",
-    "shall","up","down","out","into","through","across","between","among",
+    "the", "and", "but", "or", "nor", "for", "yet", "so", "a", "an", "to", "in", "on",
+    "at", "by", "from", "with", "of", "as", "that", "this", "these", "those", "is",
+    "are", "was", "were", "be", "been", "being", "it", "its", "if", "then", "else",
+    "also", "not", "very", "just", "such", "than", "because", "when", "where", "while",
+    "however", "therefore", "thus", "although", "though", "unless", "until", "whether",
+    "like", "unlike", "about", "above", "below", "under", "over", "again", "already",
+    "still", "even", "too", "very", "maybe", "perhaps", "almost", "nearly", "basically",
+    "actually", "literally", "really", "kind", "sort", "part", "might", "should",
+    "could", "would", "will", "can", "may", "shall", "up", "down", "out", "into",
+    "through", "across", "between", "among"
 ]
 
+# Medical terms (must be uppercase exactly)
 MEDICAL_TERMS = [
-    " USP ", " FDA ", " DEA ", " CDC ", " NIH ", " HIPAA ",
-    " NDC ", " CMS ", " CLIA ", " EMR ", " EHR ", " HCP ", " MSL ",
-    " RA ", " PK ", " PD ", " IRB ", " PI ", " API ",
-    " Medicare ", " Medicaid ", " VA ", " DoD ",
-    " HEOR ", " ICER ", "QALY", " MTM ",
-    " Oncology ", " Cardiology ", " Neurology ", " Pharmacology ",
+    "USP", "FDA", "DEA", "CDC", "NIH", "HIPAA",
+    "NDC", "CMS", "CLIA", "EMR", "EHR", "HCP", "MSL",
+    "RA", "PK", "PD", "IRB", "PI", "API",
+    "Medicare", "Medicaid", "VA", "DoD",
+    "HEOR", "ICER", "QALY", "MTM",
+    "Oncology", "Cardiology", "Neurology", "Pharmacology"
 ]
 
 FILLER_PATTERNS = [
-    r"um", r"uh", r"er", r"umm+", r"uhh+",
-    r"you know", r"i mean", r"kind of", r"sort of",
-    r"okay", r"basically", r"actually", r"literally",
+    r"\bum\b", r"\buh\b", r"\ber\b", r"\bumm+\b", r"\buhh+\b",
+    r"\byou know\b", r"\bi mean\b", r"\bkind of\b", r"\bsort of\b",
+    r"\bso\b", r"\bokay\b", r"\bbasically\b", r"\bactually\b", r"\bliterally\b"
 ]
-
-# Only fix THESE repeated words:  "I, I"
-STRICT_REPEAT_WORDS = ["I"]
 
 NUM_WORDS = {
     "1": "one", "2": "two", "3": "three", "4": "four",
     "5": "five", "6": "six", "7": "seven", "8": "eight", "9": "nine"
 }
 
-TIMESTAMP_PATTERN = re.compile(r"\d{1,2}:\d{2}")
-
-
-# ============================================================
-# HELPERS
-# ============================================================
+# ==========================
+#   HELPERS
+# ==========================
 
 def remove_filler_words(text):
     for pat in FILLER_PATTERNS:
-        text = re.sub(rf"(^|\s){pat}([, ]+|$)", " ", text, flags=re.IGNORECASE)
+        text = re.sub(rf"[, ]*\b{pat}\b[, ]*", " ", text, flags=re.IGNORECASE)
     return text
 
 
-def collapse_repeated_specific(text):
-    """
-    Only collapse "I, I" → "I"
-    Does NOT touch "that, that", "then, then", etc.
-    """
-    for w in STRICT_REPEAT_WORDS:
-        pattern = rf"\b{w},\s*{w}\b"
-        text = re.sub(pattern, w, text)
+def remove_unwanted_repeated_words(text):
+    # Fix ONLY the “I, I” case (preserve comma)
+    text = re.sub(r"\bI,\s*I\b", "I", text)
     return text
 
 
 def convert_single_digits(text):
-    """
-    Convert single digits to words EXCEPT inside timestamps ("8:30").
-    """
-    parts = re.split(r'(\d+:\d+)', text)  # keep timestamps intact
-
-    new_parts = []
-    for part in parts:
-        if TIMESTAMP_PATTERN.fullmatch(part):
-            new_parts.append(part)
-            continue
-
-        converted = re.sub(r"\b([1-9])\b",
-                           lambda m: NUM_WORDS[m.group(1)],
-                           part)
-        new_parts.append(converted)
-
-    return "".join(new_parts)
+    # Skip times like 8:30
+    return re.sub(
+        r"\b([1-9])\b(?!:)",  # Not followed by a colon → avoids time conversion
+        lambda m: NUM_WORDS[m.group(1)],
+        text
+    )
 
 
 def lowercase_common_words(text):
-    def fix(m):
-        word = m.group(0)
+    def fix(match):
+        word = match.group(0)
         if word.lower() in COMMON_LOWER_WORDS:
             return word.lower()
         return word
     return re.sub(r"\b[A-Z][a-z]+\b", fix, text)
 
 
-def capitalize_after_filler_removal(text):
-    """
-    Capitalize the first alphabetic character of the line.
-    Works even if filler removal created leading spaces.
-    """
-    i = 0
-    while i < len(text) and not text[i].isalpha():
-        i += 1
-
-    if i < len(text) and text[i].islower():
-        text = text[:i] + text[i].upper() + text[i+1:]
-
-    return text
-
-
 def restore_medical_terms(text):
     for term in MEDICAL_TERMS:
-        cleaned = term.strip()
-        text = re.sub(cleaned, cleaned, text, flags=re.IGNORECASE)
+        text = re.sub(
+            rf"\b{term}\b",
+            term,
+            text,
+            flags=re.IGNORECASE
+        )
     return text
 
 
-# ============================================================
-# MAIN CLEAN FUNCTION
-# ============================================================
+def capitalize_first_word(text):
+    stripped = text.lstrip()
+    leading_spaces = len(text) - len(stripped)
+
+    if not stripped:
+        return text
+
+    parts = stripped.split(" ", 1)
+    first_word = parts[0]
+    rest = parts[1] if len(parts) > 1 else ""
+
+    # Capitalize only the first alphabetic character
+    if first_word[0].isalpha():
+        first_word = first_word[0].upper() + first_word[1:].lower()
+
+    rebuilt = first_word + (" " + rest if rest else "")
+    return " " * leading_spaces + rebuilt
+
+
+def fix_conjunction_across_lines(lines):
+    new = []
+    for i, line in enumerate(lines):
+        if i > 0:
+            prev = new[-1].rstrip()
+            word = line.strip().split(" ")[0].lower()
+
+            if word in CONJUNCTIONS:
+                if prev and prev[-1] not in ".?!,":
+                    new[-1] = prev + ","
+                line = re.sub(rf"^({word}),\s*", rf"\1 ", line, flags=re.IGNORECASE)
+
+        new.append(line)
+    return new
+
+
+# ==========================
+#  MAIN FUNCTION
+# ==========================
 
 def clean_vtt_text(input_path, output_path):
     with open(input_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
-    cleaned_lines = []
+    cleaned = []
 
     for line in lines:
         stripped = line.strip()
 
-        # DO NOT clean any of this:
-        if (
-            stripped == "" or
-            stripped == "WEBVTT" or
-            stripped.startswith("NOTE") or
-            stripped.startswith("{") or
-            "-->" in line or
-            "<" in line and ">" in line and not line.startswith("<v")
-        ):
-            cleaned_lines.append(line)
+        # Skip untouched lines
+        if stripped == "" or \
+           stripped.startswith("WEBVTT") or \
+           "-->" in stripped or \
+           stripped.startswith("NOTE") or \
+           stripped.startswith("{") or \
+           stripped.startswith("}") or \
+           stripped.startswith("RAW") or \
+           not "<v" in line:
+            cleaned.append(line)
             continue
 
-        # Only clean real speaker lines like: <v Mark>text...
-        if "<v" in line and ">" in line:
-            prefix, text = line.split(">", 1)
-            text = text.strip()
+        # Process speaker lines
+        before, after = line.split(">", 1)
+        text = after
 
-            original = text
+        text = remove_filler_words(text)
+        text = text.strip()
 
-            text = remove_filler_words(text)
-text = text.strip()
+        text = remove_unwanted_repeated_words(text)
+        text = convert_single_digits(text)
+        text = lowercase_common_words(text)
+        text = restore_medical_terms(text)
+        text = capitalize_first_word(text)
 
-text = collapse_repeated_specific(text)
-text = convert_single_digits(text)
-text = lowercase_common_words(text)
-text = restore_medical_terms(text)
+        cleaned.append(before + ">" + text + "\n")
 
-# MUST BE LAST
-text = capitalize_after_filler_removal(text)
+    cleaned = fix_conjunction_across_lines(cleaned)
 
-            cleaned_lines.append(prefix + ">" + text + "\n")
-        else:
-            cleaned_lines.append(line)
-
-    # Preserve ALL original spacing automatically by writing exact list
     with open(output_path, "w", encoding="utf-8") as f:
-        f.writelines(cleaned_lines)
+        f.writelines(cleaned)
 
     print(f"\n✔ Cleaning complete.\nSaved → {output_path}\n")
