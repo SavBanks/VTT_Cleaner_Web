@@ -19,12 +19,12 @@ COMMON_LOWER_WORDS = [
 ]
 
 MEDICAL_TERMS = [
-    " USP ", " FDA ", " DEA ", " CDC ", " NIH ", " HIPAA ",
-    " NDC ", " CMS ", " CLIA ", " EMR ", " EHR ", " HCP ", " MSL ",
-    " RA ", " PK ", " PD ", " IRB ", " PI ", " API ",
-    " Medicare ", " Medicaid ", " VA ", " DoD ",
-    " HEOR ", " ICER ", "QALY", " MTM ",
-    " Oncology ", " Cardiology ", " Neurology ", " Pharmacology ",
+    "USP", "FDA", "DEA", "CDC", "NIH", "HIPAA",
+    "NDC", "CMS", "CLIA", "EMR", "EHR", "HCP", "MSL",
+    "RA", "PK", "PD", "IRB", "PI", "API",
+    "Medicare", "Medicaid", "VA", "DoD",
+    "HEOR", "ICER", "QALY", "MTM",
+    "Oncology", "Cardiology", "Neurology", "Pharmacology",
 ]
 
 FILLER_PATTERNS = [
@@ -47,17 +47,7 @@ NUM_WORDS = {
 }
 
 # ==========================
-#   FIX FUNCTIONS
-# ==========================
-
-def capitalize_first_real_word(text):
-    return re.sub(r"^([a-z])", lambda m: m.group(1).upper(), text)
-
-def fix_I_comma_I(text):
-    return re.sub(r"\b[Ii]\s*,\s*[Ii]\b", "I", text)
-
-# ==========================
-#   EXISTING FUNCTIONS (unchanged)
+#   FUNCTIONS
 # ==========================
 
 def remove_filler_words(text):
@@ -66,10 +56,17 @@ def remove_filler_words(text):
     return text
 
 def collapse_repeated_words_across_lines(text):
-    return re.sub(r"\b(\w+)\s+\1\b", r"\1", text, flags=re.IGNORECASE)
+    # Handles "I, I" safely but keeps "that, that" if intentional
+    text = re.sub(r"\bI,\s*I\b", "I", text)
+    return text
 
 def convert_single_digits(text):
-    return re.sub(r"\b([1-9])\b", lambda m: NUM_WORDS[m.group(1)], text)
+    # Do NOT convert times (e.g., 8:30 stays 8:30)
+    return re.sub(
+        r"\b([1-9])\b(?!:)",  # negative lookahead prevents matching before a colon
+        lambda m: NUM_WORDS[m.group(1)],
+        text
+    )
 
 def fix_conjunction_across_lines(lines):
     new_lines = []
@@ -77,10 +74,12 @@ def fix_conjunction_across_lines(lines):
         if i > 0:
             prev = new_lines[-1].rstrip()
             word = line.strip().split(" ")[0].lower()
+
             if word in CONJUNCTIONS:
                 if prev and prev[-1] not in ".?!,":
                     new_lines[-1] = prev + ","
                 line = re.sub(rf"^({word}),\s*", rf"\1 ", line, flags=re.IGNORECASE)
+
         new_lines.append(line)
     return new_lines
 
@@ -88,7 +87,9 @@ def lowercase_common_words(text):
     def fix(match):
         word = match.group(0)
         lw = word.lower()
-        return lw if lw in COMMON_LOWER_WORDS else word
+        if lw in COMMON_LOWER_WORDS:
+            return lw
+        return word
     return re.sub(r"\b[A-Z][a-z]+\b", fix, text)
 
 def restore_medical_terms(text):
@@ -101,38 +102,55 @@ def restore_medical_terms(text):
 # ==========================
 
 def clean_vtt_text(input_path, output_path):
+
     with open(input_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
     cleaned_lines = []
 
     for line in lines:
-        if "<v" in line:
 
-            text_part = line.split(">", 1)[1] if ">" in line else line
+        stripped = line.strip()
+
+        # ====================
+        # 1. Skip NOTE blocks entirely
+        # ====================
+        if stripped.startswith("NOTE"):
+            cleaned_lines.append(line)
+            continue
+
+        # ====================
+        # 2. Skip timestamps completely
+        # ====================
+        if re.match(r"\d{2}:\d{2}:\d{2}\.\d{3}", stripped):
+            cleaned_lines.append(line)
+            continue
+
+        # ====================
+        # 3. Clean only the speaker text AFTER the <v ...>
+        # ====================
+        if "<v" in line:
+            prefix, text_part = line.split(">", 1)
 
             text_part = remove_filler_words(text_part)
-
-            # FIX: Capitalize after filler removal
-            text_part = capitalize_first_real_word(text_part)
-
             text_part = collapse_repeated_words_across_lines(text_part)
-
-            # FIX: Remove only "I, I"
-            text_part = fix_I_comma_I(text_part)
-
             text_part = convert_single_digits(text_part)
             text_part = lowercase_common_words(text_part)
             text_part = restore_medical_terms(text_part)
 
-            if ">" in line:
-                line = line.split(">", 1)[0] + ">" + text_part
-            else:
-                line = text_part
+            # Capitalize if filler words removed the first word
+            if text_part.strip():
+                text_part = text_part[0].upper() + text_part[1:]
 
+            cleaned_lines.append(prefix + ">" + text_part)
+            continue
+
+        # ALL OTHER LINES — keep exactly as-is
         cleaned_lines.append(line)
 
     cleaned_lines = fix_conjunction_across_lines(cleaned_lines)
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.writelines(cleaned_lines)
+
+    print("\n✔ Cleaning complete.\n")
