@@ -22,12 +22,12 @@ COMMON_LOWER_WORDS = [
 
 # Medical terms & acronyms that should remain capitalized EXACTLY as written
 MEDICAL_TERMS = [
-    "USP", "FDA", "DEA", "CDC", "NIH", "HIPAA",
-    "NDC", "CMS", "CLIA", "EMR", "EHR", "HCP", "MSL",
-    "RA", "PK", "PD", "IRB", "PI", "API",
-    "Medicare", "Medicaid", "VA", "DoD",
-    "HEOR", "ICER", "QALY", "MTM",
-    "Oncology", "Cardiology", "Neurology", "Pharmacology",
+    " USP ", " FDA ", " DEA ", " CDC ", " NIH ", " HIPAA ",
+    " NDC ", " CMS ", " CLIA ", " EMR ", " EHR ", " HCP ", " MSL ",
+    " RA ", " PK ", " PD ", " IRB ", " PI ", " API ",
+    " Medicare ", " Medicaid ", " VA ", " DoD ",
+    " HEOR ", "ICER", "QALY", "MTM",
+    " Oncology ", " Cardiology ", " Neurology ", " Pharmacology ",
 ]
 
 # Filler words (with comma cleanup)
