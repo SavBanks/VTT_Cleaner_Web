@@ -1,35 +1,28 @@
-from flask import Flask, request, send_file, render_template, make_response
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 from clean_vtt import clean_vtt_text
-import tempfile
 
 app = Flask(__name__)
+CORS(app)
 
 @app.route("/")
-def index():
-    return render_template("index.html")
+def home():
+    return "VTT Cleaner Running"
 
 @app.route("/clean", methods=["POST"])
 def clean():
     if "file" not in request.files:
-        return "No file uploaded", 400
+        return jsonify({"error": "No file uploaded"}), 400
 
     file = request.files["file"]
-    original_text = file.read().decode("utf-8")
+    content = file.read().decode("utf-8", errors="replace")
 
-    cleaned = clean_vtt_text(original_text)
+    cleaned = clean_vtt_text(content)
 
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".vtt")
-    with open(tmp.name, "w", encoding="utf-8") as f:
-        f.write(cleaned)
-
-    response = make_response(send_file(
-        tmp.name,
-        as_attachment=True,
-        download_name="cleaned.vtt",
-        mimetype="text/vtt"
-    ))
-
-    return response
+    return cleaned, 200, {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Content-Disposition": "attachment; filename=cleaned.vtt"
+    }
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=5000)
