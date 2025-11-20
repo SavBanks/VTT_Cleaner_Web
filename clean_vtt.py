@@ -7,234 +7,176 @@ import re
 CONJUNCTIONS = ["and", "but", "or", "nor", "yet", "so"]
 
 COMMON_LOWER_WORDS = [
-    "the", "and", "but", "or", "nor", "for", "yet", "so", "a", "an", "to", "in", "on",
-    "at", "by", "from", "with", "of", "as", "that", "this", "these", "those", "is",
-    "are", "was", "were", "be", "been", "being", "it", "its", "if", "then", "else",
-    "also", "not", "very", "just", "such", "than", "because", "when", "where", "while",
-    "however", "therefore", "thus", "although", "though", "unless", "until", "whether",
-    "like", "unlike", "about", "above", "below", "under", "over", "again", "already",
-    "still", "even", "too", "very", "maybe", "perhaps", "almost", "nearly", "basically",
-    "actually", "literally", "really", "kind", "sort", "part", "might", "should",
-    "could", "would", "will", "can", "may", "shall", "up", "down", "out", "into",
-    "through", "across", "between", "among"
+    "the","and","but","or","nor","for","yet","so","a","an","to","in","on","at","by",
+    "from","with","of","as","that","this","these","those","is","are","was","were",
+    "be","been","being","it","its","if","then","else","also","not","very","just",
+    "such","than","because","when","where","while","however","therefore","thus",
+    "although","though","unless","until","whether","like","unlike","about","above",
+    "below","under","over","again","already","still","even","too","very","maybe",
+    "perhaps","almost","nearly","basically","actually","literally","really",
+    "kind","sort","part","might","should","could","would","will","can","may",
+    "shall","up","down","out","into","through","across","between","among",
 ]
 
 MEDICAL_TERMS = [
     "USP", "FDA", "DEA", "CDC", "NIH", "HIPAA",
     "NDC", "CMS", "CLIA", "EMR", "EHR", "HCP", "MSL",
     "RA", "PK", "PD", "IRB", "PI", "API",
-    "MEDICARE", "MEDICAID", "VA", "DOD",
+    "Medicare", "Medicaid", "VA", "DoD",
     "HEOR", "ICER", "QALY", "MTM",
-    "ONCOLOGY", "CARDIOLOGY", "NEUROLOGY", "PHARMACOLOGY"
+    "Oncology", "Cardiology", "Neurology", "Pharmacology",
 ]
-
-# compile medical set for fast checks
-_MEDICAL_SET = set(MEDICAL_TERMS)
 
 FILLER_PATTERNS = [
-    r"\bum\b", r"\buh\b", r"\ber\b", r"\bumm+\b", r"\buhh+\b",
-    r"\byou know\b", r"\bi mean\b", r"\bkind of\b", r"\bsort of\b",
-    r"\bso\b", r"\bokay\b", r"\bbasically\b", r"\bactually\b", r"\bliterally\b"
+    r"\bum\b", r"\buh\b", r"\ber\b",
+    r"\bumm+\b", r"\buhh+\b",
+    r"\byou know\b",
+    r"\bi mean\b",
+    r"\bkind of\b",
+    r"\bsort of\b",
+    r"\bokay\b",
+    r"\bbasically\b",
+    r"\bactually\b",
+    r"\bliterally\b",
 ]
-
-# combined regex to detect leading filler quickly (used to check original start)
-_LEADING_FILLER_RE = re.compile(r'^\s*(?:' + '|'.join(p.strip(r'\b') for p in FILLER_PATTERNS) + r')', flags=re.IGNORECASE)
 
 NUM_WORDS = {
     "1": "one", "2": "two", "3": "three", "4": "four",
     "5": "five", "6": "six", "7": "seven", "8": "eight", "9": "nine"
 }
 
-TIMESTAMP_PATTERN = re.compile(r"\d{1,2}:\d{2}")
+# ==========================
+# HELPER DETECTORS
+# ==========================
+
+def is_timestamp(line):
+    return bool(re.match(r"^\d{2}:\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}:\d{2}\.\d{3}$", line.strip()))
+
+def is_note_line(line):
+    return line.strip().startswith("NOTE")
+
+def starts_with_speaker(line):
+    return "<v" in line
 
 # ==========================
-#   HELPERS
+#  CLEANING FUNCTIONS
 # ==========================
 
 def remove_filler_words(text):
     for pat in FILLER_PATTERNS:
-        text = re.sub(rf"(^|\s){pat}([, ]+|$)", " ", text, flags=re.IGNORECASE)
-    # collapse extra spaces
-    text = re.sub(r"\s{2,}", " ", text)
-    return text.strip()
+        text = re.sub(rf"[, ]*\b{pat}\b[, ]*", " ", text, flags=re.IGNORECASE)
+    return text
 
-def remove_unwanted_repeated_I(text):
-    # Replace "I, I" (case-insensitive) with a single capital I
-    return re.sub(r'\b[Ii]\s*,\s*[Ii]\b', 'I', text)
+def collapse_repeated_words(text):
+    # ONLY collapse things like "I, I" or "word, word"
+    return re.sub(r"\b(\w+),\s+\1\b", r"\1", text, flags=re.IGNORECASE)
 
 def convert_single_digits(text):
-    # preserve timestamps like 8:30 by skipping patterns with colon
-    parts = re.split(r'(\d+:\d+)', text)  # will keep timestamps in the list
-    out = []
-    for p in parts:
-        if TIMESTAMP_PATTERN.fullmatch(p):
-            out.append(p)
-        else:
-            out.append(re.sub(r"\b([1-9])\b", lambda m: NUM_WORDS[m.group(1)], p))
-    return "".join(out)
+    # Skip times like "8:30"
+    return re.sub(
+        r"\b([1-9])\b(?!:)", 
+        lambda m: NUM_WORDS[m.group(1)],
+        text
+    )
 
 def lowercase_common_words(text):
-    def fix(m):
-        w = m.group(0)
-        if w.lower() in COMMON_LOWER_WORDS:
-            return w.lower()
-        return w
+    def fix(match):
+        word = match.group(0)
+        lw = word.lower()
+        return lw if lw in COMMON_LOWER_WORDS else word
     return re.sub(r"\b[A-Z][a-z]+\b", fix, text)
 
 def restore_medical_terms(text):
-    # restore medical acronyms/titles only when they appear as whole words
-    for term in _MEDICAL_SET:
-        text = re.sub(rf"\b{re.escape(term)}\b", term, text, flags=re.IGNORECASE)
+    for term in MEDICAL_TERMS:
+        text = re.sub(rf"\b{term}\b", term, text, flags=re.IGNORECASE)
     return text
 
-def capitalize_first_word_only(text):
-    """
-    Capitalize only the first word of the line.
-    We lowercase the rest of that first word (so it becomes Title-case for the first word).
-    """
+def smart_capitalize(text):
     if not text:
         return text
-    # preserve leading whitespace
-    leading_ws = re.match(r'^\s*', text).group(0)
-    stripped = text[len(leading_ws):]
-    if not stripped:
-        return text
-    parts = stripped.split(' ', 1)
-    first = parts[0]
-    rest = parts[1] if len(parts) > 1 else ''
-    # capitalize first letter, lowercase the rest of the first word
-    if first and first[0].isalpha():
-        first = first[0].upper() + first[1:].lower()
-    rebuilt = first + ((' ' + rest) if rest else '')
-    return leading_ws + rebuilt
-
-def force_lowercase_first_word_if_needed(text):
-    """
-    When we should NOT capitalize the line start, ensure the first word is not capitalized,
-    except when it's a protected item (I pronoun or a medical acronym).
-    """
-    if not text:
-        return text
-    leading_ws = re.match(r'^\s*', text).group(0)
-    stripped = text[len(leading_ws):]
-    if not stripped:
-        return text
-    parts = stripped.split(' ', 1)
-    first = parts[0]
-    rest = parts[1] if len(parts) > 1 else ''
-    # Check protections
-    if first == 'I':
-        return text  # keep capital I
-    if first.upper() in _MEDICAL_SET:
-        # restore exact medical casing (from MEDICAL_TERMS list)
-        correct = next((t for t in MEDICAL_TERMS if t.upper() == first.upper()), first)
-        return leading_ws + correct + ((' ' + rest) if rest else '')
-    # Otherwise lowercase first character (but keep the rest of the word as-is)
-    if first and first[0].isalpha():
-        first = first[0].lower() + first[1:]
-    rebuilt = first + ((' ' + rest) if rest else '')
-    return leading_ws + rebuilt
-
-def original_starts_with_filler(orig_text):
-    return bool(_LEADING_FILLER_RE.search(orig_text.strip()))
-
-def find_previous_speaker_text(cleaned_lines):
-    """
-    Scan cleaned_lines backwards and return the first speaker-text portion (without tag).
-    Returns None if none found.
-    """
-    for prev in reversed(cleaned_lines):
-        if "<v" in prev and ">" in prev:
-            return prev.split(">", 1)[1].strip()
-    return None
+    return text[0].upper() + text[1:]
 
 def fix_conjunction_across_lines(lines):
-    new = []
+    new_lines = []
     for i, line in enumerate(lines):
         if i > 0:
-            prev = new[-1].rstrip()
-            # get first word of current line (after any tag)
-            candidate = line.strip()
-            # if line is speaker line, skip tag to get first word
-            if "<v" in line and ">" in line:
-                candidate = line.split(">",1)[1].strip()
-            first_word = candidate.split(" ")[0].lower() if candidate else ""
+            prev = new_lines[-1].rstrip()
+            first_word = line.strip().split(" ")[0].lower()
+
             if first_word in CONJUNCTIONS:
                 if prev and prev[-1] not in ".?!,":
-                    new[-1] = prev + ","
-                # remove stray comma after conjunction
+                    new_lines[-1] = prev + ","
                 line = re.sub(rf"^({first_word}),\s*", rf"\1 ", line, flags=re.IGNORECASE)
-        new.append(line)
-    return new
+
+        new_lines.append(line)
+    return new_lines
 
 # ==========================
-#  MAIN FUNCTION
+#  MAIN PROCESSOR
 # ==========================
 
 def clean_vtt_text(input_path, output_path):
+
     with open(input_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
-    cleaned = []
+    cleaned_lines = []
+    prev_was_sentence_end = True  # Allows capitalization on very first line of text
 
     for line in lines:
-        stripped = line.strip()
+        original_line = line
 
-        # Preserve untouched lines exactly (timestamps, NOTE blocks, headers, blank lines)
-        if (stripped == "" or
-            stripped.startswith("WEBVTT") or
-            "-->" in line or
-            stripped.startswith("NOTE") or
-            stripped.startswith("{") or
-            stripped.startswith("}")):
-            cleaned.append(line)
+        # Preserve spacing exactly
+        if original_line.strip() == "":
+            cleaned_lines.append(original_line)
             continue
 
-        # Process only speaker lines with a tag <v ...>
-        if "<v" in line and ">" in line:
-            tag, after = line.split(">", 1)
-            orig_after = after.rstrip("\n")  # original spoken text (keep for filler detection)
+        # Preserve timestamps 100% untouched
+        if is_timestamp(original_line):
+            cleaned_lines.append(original_line)
+            continue
 
-            # Determine previous speaker line's final punctuation status
-            prev_speaker_text = find_previous_speaker_text(cleaned)
-            prev_ends_sentence = False
-            if prev_speaker_text:
-                prev_ends_sentence = prev_speaker_text.endswith(('.', '?', '!'))
+        # Preserve NOTE blocks 100% untouched
+        if is_note_line(original_line):
+            cleaned_lines.append(original_line)
+            continue
 
-            # Determine whether original started with a filler (Um, etc.)
-            started_with_filler = original_starts_with_filler(orig_after)
+        # Speaker lines get cleaned only AFTER the ">"
+        if starts_with_speaker(original_line):
 
-            # Cleaning pipeline (do not finalize capitalization yet)
-            text = orig_after
+            speaker_tag, text = original_line.split(">", 1)
+            speaker_tag += ">"
 
-            text = remove_filler_words(text)
-            text = remove_unwanted_repeated_I(text)
-            text = convert_single_digits(text)
-            text = lowercase_common_words(text)
-            text = restore_medical_terms(text)
+            # CLEAN ONLY the text part
+            cleaned = text
 
-            # Now apply capitalization rule:
-            if prev_ends_sentence or started_with_filler:
-                # Capitalize the first word (safe)
-                text = capitalize_first_word_only(text)
+            before = cleaned
+            cleaned = remove_filler_words(cleaned)
+            filler_was_removed = (cleaned != before)
+
+            cleaned = collapse_repeated_words(cleaned)
+            cleaned = convert_single_digits(cleaned)
+            cleaned = lowercase_common_words(cleaned)
+            cleaned = restore_medical_terms(cleaned)
+
+            # Smart capitalization:
+            if filler_was_removed:
+                cleaned = smart_capitalize(cleaned)
             else:
-                # Do NOT capitalize the first word — force lowercase if not protected
-                text = force_lowercase_first_word_if_needed(text)
+                if prev_was_sentence_end:
+                    cleaned = smart_capitalize(cleaned)
 
-            # Reassemble, preserving the same tag and newline behavior
-            # Keep trailing newline if original had it
-            newline = "\n" if line.endswith("\n") else ""
-            cleaned.append(tag + ">" + text + newline)
+            prev_was_sentence_end = cleaned.rstrip().endswith((".", "?", "!"))
+
+            cleaned_lines.append(speaker_tag + cleaned)
             continue
 
-        # All other lines — keep exactly as-is
-        cleaned.append(line)
+        # Any other lines: keep unchanged
+        cleaned_lines.append(original_line)
 
-    # Fix conjunctions (needs context across lines)
-    cleaned = fix_conjunction_across_lines(cleaned)
+    cleaned_lines = fix_conjunction_across_lines(cleaned_lines)
 
-    # Write back preserving exact spacing and line count
     with open(output_path, "w", encoding="utf-8") as f:
-        f.writelines(cleaned)
+        f.writelines(cleaned_lines)
 
-    print(f"\n✔ Cleaning complete.\nSaved → {output_path}\n")
+    print(f"\n✔ Cleaning complete. Saved → {output_path}\n")
