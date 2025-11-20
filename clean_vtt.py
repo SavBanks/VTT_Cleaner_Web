@@ -40,7 +40,6 @@ FILLER_PATTERNS = [
     r"\bsort of\b",
     r"\blike\b",
     r"\bso\b",
-    r"\bwell\b",
     r"\bokay\b",
     r"\bbasically\b",
     r"\bactually\b",
