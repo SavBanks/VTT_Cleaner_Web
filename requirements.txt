@@ -1,2 +1,3 @@
-flask
-language_tool_python
+Flask
+flask-cors
+gunicorn
