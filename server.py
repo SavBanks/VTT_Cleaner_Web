@@ -1,36 +1,35 @@
-from flask import Flask, request, send_file, render_template
-from clean_vtt import clean_vtt_file
-import os
+from flask import Flask, request, send_file, render_template, make_response
+from clean_vtt import clean_vtt_text
+import tempfile
 
 app = Flask(__name__)
 
-# Route for the upload page
-@app.route("/", methods=["GET"])
+@app.route("/")
 def index():
     return render_template("index.html")
 
-# Route to handle file uploads and cleaning
-@app.route("/upload", methods=["POST"])
-def upload_file():
-    uploaded_file = request.files.get("file")
-    if not uploaded_file or uploaded_file.filename == "":
+@app.route("/clean", methods=["POST"])
+def clean():
+    if "file" not in request.files:
         return "No file uploaded", 400
 
-    input_filename = uploaded_file.filename
-    input_path = os.path.join("/tmp", input_filename)
-    uploaded_file.save(input_path)
+    file = request.files["file"]
+    original_text = file.read().decode("utf-8")
 
-    # Create output filename
-    output_filename = "cleaned_" + input_filename
-    output_path = os.path.join("/tmp", output_filename)
+    cleaned = clean_vtt_text(original_text)
 
-    # Run your cleaning script
-    clean_vtt_file(input_path, output_path)
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".vtt")
+    with open(tmp.name, "w", encoding="utf-8") as f:
+        f.write(cleaned)
 
-    # Send the cleaned file back to the user
-    return send_file(output_path, as_attachment=True)
+    response = make_response(send_file(
+        tmp.name,
+        as_attachment=True,
+        download_name="cleaned.vtt",
+        mimetype="text/vtt"
+    ))
 
-# Ensure Flask binds to Render's assigned port
+    return response
+
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=10000)
