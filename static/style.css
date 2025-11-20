@@ -1,169 +1,84 @@
-/* ---------- Base Layout ---------- */
-
+/* General layout */
 body {
-    font-family: Arial, sans-serif;
-    background: #f2f3f7;
+    font-family: 'Arial', sans-serif;
     margin: 0;
     padding: 0;
+    background-color: #ffffff;
+    color: #1C1C1C;
+}
+
+header {
+    background-color: #b31b1b; /* Scarlet */
+    color: #cccccc; /* Light gray */
+    padding: 20px;
+    text-align: center;
+    font-size: 1.5em;
+    font-weight: bold;
+}
+
+main {
+    padding: 40px 20px;
     display: flex;
     justify-content: center;
-    align-items: center;
-    height: 100vh;
-    transition: background 0.3s ease;
 }
 
-.dark {
-    background: #1d1f24;
-    color: white;
-}
-
-/* ---------- Card Container ---------- */
-
-.card {
-    background: white;
-    width: 95%;
-    max-width: 520px;
-    padding: 32px;
-    border-radius: 16px;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+.container {
+    max-width: 500px;
+    width: 100%;
     text-align: center;
-    transition: background 0.3s ease, color 0.3s ease;
 }
 
-.dark .card {
-    background: #2a2d33;
-    color: white;
+input[type="file"] {
+    margin-bottom: 15px;
 }
-
-/* ---------- Logo & Header ---------- */
-
-.logo-container {
-    margin-bottom: 20px;
-}
-
-.subtitle {
-    font-size: 14px;
-    margin-top: 6px;
-    color: #555;
-}
-
-.dark .subtitle {
-    color: #ccc;
-}
-
-/* ---------- Dropzone ---------- */
-
-#dropzone {
-    margin-top: 20px;
-    padding: 40px;
-    border: 2px dashed #BB0000;
-    border-radius: 12px;
-    background: #fff8f8;
-    color: #333;
-    cursor: pointer;
-    transition: background 0.2s ease, border 0.2s ease;
-}
-
-.dark #dropzone {
-    background: #3a3d44;
-    color: white;
-}
-
-#dropzone.dragover {
-    background: #ffe6e6;
-    border-color: #900000;
-}
-
-/* ---------- Buttons ---------- */
 
 button {
-    width: 100%;
-    margin-top: 25px;
-    padding: 14px;
+    background-color: #b31b1b;
+    color: #ffffff;
     border: none;
-    background: #BB0000;
-    color: white;
-    font-size: 16px;
-    border-radius: 10px;
+    padding: 10px 20px;
+    font-size: 1em;
     cursor: pointer;
-    transition: background 0.2s ease;
+    border-radius: 6px;
 }
 
 button:hover {
-    background: #990000;
+    background-color: #7a0f14;
 }
 
-/* ---------- Status Messages ---------- */
-
-.status {
-    margin-top: 18px;
-    font-size: 15px;
+/* Status messages */
+#status-message {
+    margin-top: 20px;
+    padding: 10px;
+    border-radius: 6px;
 }
 
-.status.success {
-    color: #2e8b4c;
+#status-message.success {
+    background-color: #a0c639;
+    color: #1C1C1C;
 }
 
-.status.error {
-    color: #d9534f;
+#status-message.error {
+    background-color: #e63946;
+    color: #ffffff;
 }
 
-.loading {
-    margin-top: 15px;
-    color: #555;
+/* Dark mode */
+body.dark-mode {
+    background-color: #1C1C1C;
+    color: #f0f0f0;
 }
 
-.dark .loading {
-    color: #ddd;
+body.dark-mode header {
+    background-color: #b31b1b;
+    color: #f0f0f0;
 }
 
-/* ---------- Light/Dark Toggle ---------- */
-
-.theme-toggle {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    text-align: right;
+body.dark-mode button {
+    background-color: #b31b1b;
+    color: #f0f0f0;
 }
 
-/* Toggle switch style */
-.switch {
-    position: relative;
-    display: inline-block;
-    width: 52px;
-    height: 28px;
-}
-
-.switch input { display: none; }
-
-.slider {
-    position: absolute;
-    cursor: pointer;
-    background: #ccc;
-    border-radius: 34px;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    transition: 0.4s;
-}
-
-.slider:before {
-    content: "";
-    position: absolute;
-    height: 22px;
-    width: 22px;
-    left: 3px;
-    bottom: 3px;
-    background: white;
-    border-radius: 50%;
-    transition: 0.4s;
-}
-
-input:checked + .slider {
-    background: #BB0000;
-}
-
-input:checked + .slider:before {
-    transform: translateX(24px);
+body.dark-mode button:hover {
+    background-color: #7a0f14;
 }

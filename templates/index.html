@@ -1,137 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VTT Cleaner - Ohio State Theme</title>
-
-    <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8">
+    <title>VTT Cleaner</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-
 <body>
-    <div class="theme-toggle">
-        <label class="switch">
-            <input type="checkbox" id="themeSwitch">
-            <span class="slider"></span>
-        </label>
-        <span id="themeLabel">Light Mode</span>
+<header>
+    VTT Cleaner
+</header>
+
+<main>
+    <div class="container">
+        <h2>Upload your VTT file</h2>
+        <form id="upload-form" enctype="multipart/form-data">
+            <input type="file" name="file" id="file-input" accept=".vtt" required>
+            <button type="submit">Clean Transcript</button>
+        </form>
+
+        <div id="status-message"></div>
     </div>
+</main>
 
-    <div class="card">
-        
-        <!-- ----------  OSU-Themed Header / Logo  ---------- -->
-        <div class="logo-container">
-            <!-- This is a SAFE OSU-inspired SVG (NOT the copyrighted logo) -->
-            <svg width="70" height="70" viewBox="0 0 100 100">
-                <rect x="10" y="10" width="80" height="80" rx="15"
-                    fill="#BB0000" stroke="#666" stroke-width="4" />
-                <text x="50" y="63" font-size="40" font-family="Arial Black"
-                    text-anchor="middle" fill="white">
-                    OSU
-                </text>
-            </svg>
+<script>
+document.getElementById("upload-form").addEventListener("submit", async function(e){
+    e.preventDefault();
+    const fileInput = document.getElementById("file-input");
+    const status = document.getElementById("status-message");
 
-            <!-- If you legally have the OSU logo, replace the SVG above with an <img> -->
-            <!-- <img src="osulogo.png" class="real-logo"> -->
+    if (!fileInput.files.length) {
+        status.textContent = "Please select a file!";
+        status.className = "error";
+        return;
+    }
 
-            <h1>Ohio State VTT Cleaner</h1>
-            <p class="subtitle">Caption Cleaning for Medical & Accessibility Standards</p>
-        </div>
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
 
-        <!-- ----------  Upload Section  ---------- -->
-        <input type="file" id="file" accept=".vtt" hidden />
+    status.textContent = "Cleaning...";
+    status.className = "";
 
-        <div id="dropzone">Drag & drop your .vtt file here<br>or click to choose</div>
+    try {
+        const response = await fetch("/clean", {
+            method: "POST",
+            body: formData
+        });
 
-        <button id="cleanBtn">Clean Transcript</button>
+        if (!response.ok) throw new Error("Cleaning failed");
 
-        <!-- ----------  Status Messages  ---------- -->
-        <div id="status" class="status"></div>
-        <div id="loading" class="loading" style="display:none;">Cleaning captions… please wait.</div>
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "cleaned_" + fileInput.files[0].name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
 
-    </div>
-
-    <!-- ----------  JavaScript  ---------- -->
-    <script>
-        const dropzone = document.getElementById("dropzone");
-        const fileInput = document.getElementById("file");
-        const cleanBtn = document.getElementById("cleanBtn");
-        const statusBox = document.getElementById("status");
-        const loading = document.getElementById("loading");
-        const themeSwitch = document.getElementById("themeSwitch");
-        const themeLabel = document.getElementById("themeLabel");
-
-        /* ---------------- Drag and Drop ---------------- */
-        dropzone.onclick = () => fileInput.click();
-
-        dropzone.ondragover = e => {
-            e.preventDefault();
-            dropzone.classList.add("dragover");
-        };
-
-        dropzone.ondragleave = () => dropzone.classList.remove("dragover");
-
-        dropzone.ondrop = e => {
-            e.preventDefault();
-            dropzone.classList.remove("dragover");
-            const file = e.dataTransfer.files[0];
-            fileInput.files = e.dataTransfer.files;
-        };
-
-        /* ---------------- Light / Dark Mode ---------------- */
-        themeSwitch.onchange = () => {
-            document.body.classList.toggle("dark");
-            themeLabel.textContent = document.body.classList.contains("dark")
-                ? "Dark Mode"
-                : "Light Mode";
-        };
-
-        /* ---------------- Handle Upload + Clean ---------------- */
-        cleanBtn.onclick = async () => {
-            const file = fileInput.files[0];
-
-            if (!file) {
-                statusBox.textContent = "Please upload a VTT file first.";
-                statusBox.className = "status error";
-                return;
-            }
-
-            loading.style.display = "block";
-            statusBox.textContent = "";
-            statusBox.className = "status";
-
-            const formData = new FormData();
-            formData.append("file", file);
-
-            try {
-                const response = await fetch("/clean", {
-                    method: "POST",
-                    body: formData
-                });
-
-                if (!response.ok) {
-                    throw new Error("Server error.");
-                }
-
-                const blob = await response.blob();
-
-                const link = document.createElement("a");
-                link.href = URL.createObjectURL(blob);
-                link.download = "cleaned.vtt";
-                link.click();
-
-                statusBox.textContent = "✔ Cleaning complete! Your download has started.";
-                statusBox.className = "status success";
-            }
-            catch (err) {
-                statusBox.textContent = "❌ Error cleaning file.";
-                statusBox.className = "status error";
-            }
-            finally {
-                loading.style.display = "none";
-            }
-        };
-    </script>
-
+        status.textContent = "✔ Cleaning complete!";
+        status.className = "success";
+    } catch (err) {
+        console.error(err);
+        status.textContent = "❌ Error cleaning file.";
+        status.className = "error";
+    }
+});
+</script>
 </body>
 </html>

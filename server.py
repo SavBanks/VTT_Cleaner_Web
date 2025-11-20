@@ -1,28 +1,35 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, send_file, render_template
 from flask_cors import CORS
-from clean_vtt import clean_vtt_text
+from clean_vtt import clean_vtt_file
+import os
 
 app = Flask(__name__)
 CORS(app)
 
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 @app.route("/")
-def home():
-    return "VTT Cleaner Running"
+def index():
+    return render_template("index.html")
 
 @app.route("/clean", methods=["POST"])
 def clean():
     if "file" not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
-
+        return {"status": "error", "message": "No file part"}, 400
     file = request.files["file"]
-    content = file.read().decode("utf-8", errors="replace")
+    if file.filename == "":
+        return {"status": "error", "message": "No selected file"}, 400
 
-    cleaned = clean_vtt_text(content)
+    input_path = os.path.join(UPLOAD_FOLDER, file.filename)
+    output_filename = "cleaned_" + file.filename
+    output_path = os.path.join(UPLOAD_FOLDER, output_filename)
+    file.save(input_path)
 
-    return cleaned, 200, {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Content-Disposition": "attachment; filename=cleaned.vtt"
-    }
+    # Run the VTT cleaning
+    clean_vtt_file(input_path, output_path)
+
+    return send_file(output_path, as_attachment=True)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
