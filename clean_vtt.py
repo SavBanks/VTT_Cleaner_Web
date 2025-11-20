@@ -47,7 +47,17 @@ NUM_WORDS = {
 }
 
 # ==========================
-#   FUNCTIONS
+#   FIX FUNCTIONS
+# ==========================
+
+def capitalize_first_real_word(text):
+    return re.sub(r"^([a-z])", lambda m: m.group(1).upper(), text)
+
+def fix_I_comma_I(text):
+    return re.sub(r"\b[Ii]\s*,\s*[Ii]\b", "I", text)
+
+# ==========================
+#   EXISTING FUNCTIONS (unchanged)
 # ==========================
 
 def remove_filler_words(text):
@@ -58,20 +68,8 @@ def remove_filler_words(text):
 def collapse_repeated_words_across_lines(text):
     return re.sub(r"\b(\w+)\s+\1\b", r"\1", text, flags=re.IGNORECASE)
 
-# ---- NEW: Fix specifically "I, I" duplicates safely ----
-def collapse_repeated_I_comma(text):
-    return re.sub(
-        r"\b([Ii])\s*,\s*\1\b",
-        lambda m: m.group(1).upper(),
-        text
-    )
-
 def convert_single_digits(text):
-    return re.sub(
-        r"\b([1-9])\b",
-        lambda m: NUM_WORDS[m.group(1)],
-        text
-    )
+    return re.sub(r"\b([1-9])\b", lambda m: NUM_WORDS[m.group(1)], text)
 
 def fix_conjunction_across_lines(lines):
     new_lines = []
@@ -79,13 +77,10 @@ def fix_conjunction_across_lines(lines):
         if i > 0:
             prev = new_lines[-1].rstrip()
             word = line.strip().split(" ")[0].lower()
-
             if word in CONJUNCTIONS:
                 if prev and prev[-1] not in ".?!,":
                     new_lines[-1] = prev + ","
-
                 line = re.sub(rf"^({word}),\s*", rf"\1 ", line, flags=re.IGNORECASE)
-
         new_lines.append(line)
     return new_lines
 
@@ -93,9 +88,7 @@ def lowercase_common_words(text):
     def fix(match):
         word = match.group(0)
         lw = word.lower()
-        if lw in COMMON_LOWER_WORDS:
-            return lw
-        return word
+        return lw if lw in COMMON_LOWER_WORDS else word
     return re.sub(r"\b[A-Z][a-z]+\b", fix, text)
 
 def restore_medical_terms(text):
@@ -115,13 +108,18 @@ def clean_vtt_text(input_path, output_path):
 
     for line in lines:
         if "<v" in line:
+
             text_part = line.split(">", 1)[1] if ">" in line else line
 
             text_part = remove_filler_words(text_part)
+
+            # FIX: Capitalize after filler removal
+            text_part = capitalize_first_real_word(text_part)
+
             text_part = collapse_repeated_words_across_lines(text_part)
 
-            # ---- NEW: fix "I, I" BEFORE lowercasing rules ----
-            text_part = collapse_repeated_I_comma(text_part)
+            # FIX: Remove only "I, I"
+            text_part = fix_I_comma_I(text_part)
 
             text_part = convert_single_digits(text_part)
             text_part = lowercase_common_words(text_part)
@@ -138,5 +136,3 @@ def clean_vtt_text(input_path, output_path):
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.writelines(cleaned_lines)
-
-    print(f"\n✔ Cleaning complete.\nSaved → {output_path}\n")
