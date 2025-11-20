@@ -1,6 +1,6 @@
 from flask import Flask, request, send_file, render_template
 from flask_cors import CORS
-from clean_vtt import clean_vtt_file
+from clean_vtt import clean_vtt_text
 import os
 
 app = Flask(__name__)
