@@ -96,17 +96,17 @@ def lowercase_common_words(text):
 
 def capitalize_after_filler_removal(text):
     """
-    If the line *starts* with lowercase after filler removal:
-    e.g. "um, so before..." → "before..."
-    Ensure: "Before..."
+    Capitalize the first alphabetic character of the line.
+    Works even if filler removal created leading spaces.
     """
-    stripped = text.lstrip()
-    leading_spaces = len(text) - len(stripped)
+    i = 0
+    while i < len(text) and not text[i].isalpha():
+        i += 1
 
-    if stripped and stripped[0].isalpha() and stripped[0].islower():
-        stripped = stripped[0].upper() + stripped[1:]
+    if i < len(text) and text[i].islower():
+        text = text[:i] + text[i].upper() + text[i+1:]
 
-    return " " * leading_spaces + stripped
+    return text
 
 
 def restore_medical_terms(text):
@@ -149,13 +149,15 @@ def clean_vtt_text(input_path, output_path):
             original = text
 
             text = remove_filler_words(text)
-            text = text.strip()
+text = text.strip()
 
-            text = capitalize_after_filler_removal(text)
-            text = collapse_repeated_specific(text)
-            text = convert_single_digits(text)
-            text = lowercase_common_words(text)
-            text = restore_medical_terms(text)
+text = collapse_repeated_specific(text)
+text = convert_single_digits(text)
+text = lowercase_common_words(text)
+text = restore_medical_terms(text)
+
+# MUST BE LAST
+text = capitalize_after_filler_removal(text)
 
             cleaned_lines.append(prefix + ">" + text + "\n")
         else:
