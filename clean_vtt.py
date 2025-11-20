@@ -1,8 +1,8 @@
 import re
 
-# ==========================
-#  CONFIGURATION LISTS
-# ==========================
+# ============================================================
+# CONFIG LISTS
+# ============================================================
 
 CONJUNCTIONS = ["and", "but", "or", "nor", "yet", "so"]
 
@@ -19,138 +19,150 @@ COMMON_LOWER_WORDS = [
 ]
 
 MEDICAL_TERMS = [
-    "USP", "FDA", "DEA", "CDC", "NIH", "HIPAA",
-    "NDC", "CMS", "CLIA", "EMR", "EHR", "HCP", "MSL",
-    "RA", "PK", "PD", "IRB", "PI", "API",
-    "Medicare", "Medicaid", "VA", "DoD",
-    "HEOR", "ICER", "QALY", "MTM",
-    "Oncology", "Cardiology", "Neurology", "Pharmacology",
+    " USP ", " FDA ", " DEA ", " CDC ", " NIH ", " HIPAA ",
+    " NDC ", " CMS ", " CLIA ", " EMR ", " EHR ", " HCP ", " MSL ",
+    " RA ", " PK ", " PD ", " IRB ", " PI ", " API ",
+    " Medicare ", " Medicaid ", " VA ", " DoD ",
+    " HEOR ", " ICER ", "QALY", " MTM ",
+    " Oncology ", " Cardiology ", " Neurology ", " Pharmacology ",
 ]
 
 FILLER_PATTERNS = [
-    r"\bum\b", r"\buh\b", r"\ber\b",
-    r"\bumm+\b", r"\buhh+\b",
-    r"\byou know\b",
-    r"\bi mean\b",
-    r"\bkind of\b",
-    r"\bsort of\b",
-    r"\bso\b",
-    r"\bokay\b",
-    r"\bbasically\b",
-    r"\bactually\b",
-    r"\bliterally\b",
+    r"um", r"uh", r"er", r"umm+", r"uhh+",
+    r"you know", r"i mean", r"kind of", r"sort of",
+    r"okay", r"basically", r"actually", r"literally",
 ]
+
+# Only fix THESE repeated words:  "I, I"
+STRICT_REPEAT_WORDS = ["I"]
 
 NUM_WORDS = {
     "1": "one", "2": "two", "3": "three", "4": "four",
     "5": "five", "6": "six", "7": "seven", "8": "eight", "9": "nine"
 }
 
-# ==========================
-#   FUNCTIONS
-# ==========================
+TIMESTAMP_PATTERN = re.compile(r"\d{1,2}:\d{2}")
+
+
+# ============================================================
+# HELPERS
+# ============================================================
 
 def remove_filler_words(text):
     for pat in FILLER_PATTERNS:
-        text = re.sub(rf"[, ]*\b{pat}\b[, ]*", " ", text, flags=re.IGNORECASE)
+        text = re.sub(rf"(^|\s){pat}([, ]+|$)", " ", text, flags=re.IGNORECASE)
     return text
 
-def collapse_repeated_words_across_lines(text):
-    # Handles "I, I" safely but keeps "that, that" if intentional
-    text = re.sub(r"\bI,\s*I\b", "I", text)
+
+def collapse_repeated_specific(text):
+    """
+    Only collapse "I, I" → "I"
+    Does NOT touch "that, that", "then, then", etc.
+    """
+    for w in STRICT_REPEAT_WORDS:
+        pattern = rf"\b{w},\s*{w}\b"
+        text = re.sub(pattern, w, text)
     return text
+
 
 def convert_single_digits(text):
-    # Do NOT convert times (e.g., 8:30 stays 8:30)
-    return re.sub(
-        r"\b([1-9])\b(?!:)",  # negative lookahead prevents matching before a colon
-        lambda m: NUM_WORDS[m.group(1)],
-        text
-    )
+    """
+    Convert single digits to words EXCEPT inside timestamps ("8:30").
+    """
+    parts = re.split(r'(\d+:\d+)', text)  # keep timestamps intact
 
-def fix_conjunction_across_lines(lines):
-    new_lines = []
-    for i, line in enumerate(lines):
-        if i > 0:
-            prev = new_lines[-1].rstrip()
-            word = line.strip().split(" ")[0].lower()
+    new_parts = []
+    for part in parts:
+        if TIMESTAMP_PATTERN.fullmatch(part):
+            new_parts.append(part)
+            continue
 
-            if word in CONJUNCTIONS:
-                if prev and prev[-1] not in ".?!,":
-                    new_lines[-1] = prev + ","
-                line = re.sub(rf"^({word}),\s*", rf"\1 ", line, flags=re.IGNORECASE)
+        converted = re.sub(r"\b([1-9])\b",
+                           lambda m: NUM_WORDS[m.group(1)],
+                           part)
+        new_parts.append(converted)
 
-        new_lines.append(line)
-    return new_lines
+    return "".join(new_parts)
+
 
 def lowercase_common_words(text):
-    def fix(match):
-        word = match.group(0)
-        lw = word.lower()
-        if lw in COMMON_LOWER_WORDS:
-            return lw
+    def fix(m):
+        word = m.group(0)
+        if word.lower() in COMMON_LOWER_WORDS:
+            return word.lower()
         return word
     return re.sub(r"\b[A-Z][a-z]+\b", fix, text)
 
+
+def capitalize_after_filler_removal(text):
+    """
+    If the line *starts* with lowercase after filler removal:
+    e.g. "um, so before..." → "before..."
+    Ensure: "Before..."
+    """
+    stripped = text.lstrip()
+    leading_spaces = len(text) - len(stripped)
+
+    if stripped and stripped[0].isalpha() and stripped[0].islower():
+        stripped = stripped[0].upper() + stripped[1:]
+
+    return " " * leading_spaces + stripped
+
+
 def restore_medical_terms(text):
     for term in MEDICAL_TERMS:
-        text = re.sub(term, term, text, flags=re.IGNORECASE)
+        cleaned = term.strip()
+        text = re.sub(cleaned, cleaned, text, flags=re.IGNORECASE)
     return text
 
-# ==========================
-#  MAIN CLEANING FUNCTION
-# ==========================
+
+# ============================================================
+# MAIN CLEAN FUNCTION
+# ============================================================
 
 def clean_vtt_text(input_path, output_path):
-
     with open(input_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
     cleaned_lines = []
 
     for line in lines:
-
         stripped = line.strip()
 
-        # ====================
-        # 1. Skip NOTE blocks entirely
-        # ====================
-        if stripped.startswith("NOTE"):
+        # DO NOT clean any of this:
+        if (
+            stripped == "" or
+            stripped == "WEBVTT" or
+            stripped.startswith("NOTE") or
+            stripped.startswith("{") or
+            "-->" in line or
+            "<" in line and ">" in line and not line.startswith("<v")
+        ):
             cleaned_lines.append(line)
             continue
 
-        # ====================
-        # 2. Skip timestamps completely
-        # ====================
-        if re.match(r"\d{2}:\d{2}:\d{2}\.\d{3}", stripped):
+        # Only clean real speaker lines like: <v Mark>text...
+        if "<v" in line and ">" in line:
+            prefix, text = line.split(">", 1)
+            text = text.strip()
+
+            original = text
+
+            text = remove_filler_words(text)
+            text = text.strip()
+
+            text = capitalize_after_filler_removal(text)
+            text = collapse_repeated_specific(text)
+            text = convert_single_digits(text)
+            text = lowercase_common_words(text)
+            text = restore_medical_terms(text)
+
+            cleaned_lines.append(prefix + ">" + text + "\n")
+        else:
             cleaned_lines.append(line)
-            continue
 
-        # ====================
-        # 3. Clean only the speaker text AFTER the <v ...>
-        # ====================
-        if "<v" in line:
-            prefix, text_part = line.split(">", 1)
-
-            text_part = remove_filler_words(text_part)
-            text_part = collapse_repeated_words_across_lines(text_part)
-            text_part = convert_single_digits(text_part)
-            text_part = lowercase_common_words(text_part)
-            text_part = restore_medical_terms(text_part)
-
-            # Capitalize if filler words removed the first word
-            if text_part.strip():
-                text_part = text_part[0].upper() + text_part[1:]
-
-            cleaned_lines.append(prefix + ">" + text_part)
-            continue
-
-        # ALL OTHER LINES — keep exactly as-is
-        cleaned_lines.append(line)
-
-    cleaned_lines = fix_conjunction_across_lines(cleaned_lines)
-
+    # Preserve ALL original spacing automatically by writing exact list
     with open(output_path, "w", encoding="utf-8") as f:
         f.writelines(cleaned_lines)
 
-    print("\n✔ Cleaning complete.\n")
+    print(f"\n✔ Cleaning complete.\nSaved → {output_path}\n")
