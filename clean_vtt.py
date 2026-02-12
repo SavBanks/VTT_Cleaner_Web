@@ -130,7 +130,8 @@ def clean_vtt_text(input_path, output_path):
 
             # ✅ ONLY punctuation controls capitalization
             if prev_was_sentence_end:
-                cleaned = smart_capitalize(cleaned)
+    cleaned = cleaned.lstrip()
+    cleaned = smart_capitalize(cleaned)
 
             prev_was_sentence_end = cleaned.rstrip().endswith((".", "?", "!"))
 
