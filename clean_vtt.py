@@ -97,34 +97,13 @@ def fix_conjunction_across_lines(lines):
         new_lines.append(line)
     return new_lines
 
-# ✅ FINAL CAPITALIZATION PASS
-def apply_sentence_capitalization(lines):
-    result = []
-    prev_sentence_end = True
-
-    for line in lines:
-        if starts_with_speaker(line):
-
-            tag, text = line.split(">", 1)
-            tag += ">"
-
-            if prev_sentence_end:
-                text = smart_capitalize(text)
-
-            prev_sentence_end = text.rstrip().endswith((".", "?", "!"))
-
-            result.append(tag + text)
-        else:
-            result.append(line)
-
-    return result
-
 def clean_vtt_text(input_path, output_path):
 
     with open(input_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
     cleaned_lines = []
+    prev_was_sentence_end = True
 
     for line in lines:
         original_line = line
@@ -133,11 +112,7 @@ def clean_vtt_text(input_path, output_path):
             cleaned_lines.append(original_line)
             continue
 
-        if is_timestamp(original_line):
-            cleaned_lines.append(original_line)
-            continue
-
-        if is_note_line(original_line):
+        if is_timestamp(original_line) or is_note_line(original_line):
             cleaned_lines.append(original_line)
             continue
 
@@ -153,15 +128,18 @@ def clean_vtt_text(input_path, output_path):
             cleaned = lowercase_common_words(cleaned)
             cleaned = restore_medical_terms(cleaned)
 
+            # ✅ ONLY punctuation controls capitalization
+            if prev_was_sentence_end:
+                cleaned = smart_capitalize(cleaned)
+
+            prev_was_sentence_end = cleaned.rstrip().endswith((".", "?", "!"))
+
             cleaned_lines.append(speaker_tag + cleaned)
             continue
 
         cleaned_lines.append(original_line)
 
     cleaned_lines = fix_conjunction_across_lines(cleaned_lines)
-
-    # ✅ Capitalization happens LAST
-    cleaned_lines = apply_sentence_capitalization(cleaned_lines)
 
     with open(output_path, "w", encoding="utf-8") as f:
         f.writelines(cleaned_lines)
