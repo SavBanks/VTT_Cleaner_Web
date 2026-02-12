@@ -159,12 +159,11 @@ def clean_vtt_text(input_path, output_path):
             cleaned = lowercase_common_words(cleaned)
             cleaned = restore_medical_terms(cleaned)
 
-            # Smart capitalization:
-            if filler_was_removed:
-                cleaned = smart_capitalize(cleaned)
-            else:
-                if prev_was_sentence_end:
-                    cleaned = smart_capitalize(cleaned)
+            # Smart capitalization based ONLY on prior sentence structure
+if prev_was_sentence_end:
+    cleaned = smart_capitalize(cleaned)
+else:
+    cleaned = cleaned.lstrip()  # ensure no leading spaces but DO NOT change case
 
             prev_was_sentence_end = cleaned.rstrip().endswith((".", "?", "!"))
 
