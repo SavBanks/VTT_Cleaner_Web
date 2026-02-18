@@ -80,7 +80,12 @@ def restore_medical_terms(text):
 def smart_capitalize(text):
     if not text:
         return text
-    return text[0].upper() + text[1:]
+
+    for i, ch in enumerate(text):
+        if ch.isalpha():  # first real letter
+            return text[:i] + ch.upper() + text[i+1:]
+
+    return text
 
 def fix_conjunction_across_lines(lines):
     new_lines = []
