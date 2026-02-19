@@ -3,7 +3,7 @@ import re
 CONJUNCTIONS = ["and", "but", "or", "nor", "yet", "so"]
 
 COMMON_LOWER_WORDS = [
-    "the","and","but","or","nor","for","yet","so","a","an","to","in","on","at","by",
+    "the","and","but","or","nor","our","for","yet","so","a","an","to","in","on","at","by",
     "from","with","of","as","that","this","these","those","is","are","was","were",
     "be","been","being","it","its","if","then","else","also","not","very","just",
     "such","than","because","when","where","while","however","therefore","thus",
